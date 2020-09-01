@@ -9,7 +9,7 @@ from tqdm import tqdm
 KEYPOINTS = 17
 
 
-def process(annotations_path, image_path, h5_path, img_height=353, img_width=257):
+def process(annotations_path, image_path, h5_path):
     """
     Process path
     """
@@ -45,7 +45,7 @@ def process(annotations_path, image_path, h5_path, img_height=353, img_width=257
 
     with h5py.File(h5_path, "w") as hf:
 
-        labels = np.empty( (0, KEYPOINTS*3), dtype=np.int)
+        labels = np.empty( (0, KEYPOINTS*3), dtype=np.float)
 
         index = 0
 
@@ -79,8 +79,13 @@ def process(annotations_path, image_path, h5_path, img_height=353, img_width=257
                 for i in range(0, KEYPOINTS*3, 3):
 
                     if keypoints[i+2] == 2:
-                        keypoints[i] = np.rint((keypoints[i] - x) / width * img_width)
-                        keypoints[i+1] = np.rint((keypoints[i+1] - y) / height * img_height)
+                        keypoints[i] = (keypoints[i] - x) / width 
+                        keypoints[i+1] = (keypoints[i+1] - y) / height
+
+                        if (keypoints[i]>1.0 or keypoints[i+1]>1.0):
+                            print( "keypoints[i]=%f, keypoints[i+1]=%f, x=%f, y=%f, width=%f, height=%f" % (keypoints[i], keypoints[i+1], x, y, width, height) )
+                    else:
+                        keypoints[i] = keypoints[i+1] = 0.0
                 
                 # Append label
                 labels = np.append(labels, [keypoints], axis=0)
@@ -91,7 +96,7 @@ def process(annotations_path, image_path, h5_path, img_height=353, img_width=257
                 # Update index
                 index = index + 1
 
-        labels_dataset = hf.create_dataset(name="labels", data=labels, shape=labels.shape, dtype=np.int)
+        labels_dataset = hf.create_dataset(name="labels", data=labels, shape=labels.shape, dtype=np.float)
 
                 
 
@@ -100,4 +105,4 @@ def process(annotations_path, image_path, h5_path, img_height=353, img_width=257
 
 if __name__ == "__main__":
 
-    process("dataset/annotations/person_keypoints_val2017.json", "dataset/val2017", "dataset/keypoints/val.h5")
+    process("dataset/annotations/person_keypoints_train2017.json", "dataset/train2017", "dataset/keypoints/train.h5")

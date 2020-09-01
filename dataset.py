@@ -9,7 +9,8 @@ import h5py
 from datetime import datetime
 import cv2
 
-transform = transforms.Compose([transforms.ToTensor()])
+transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                        std=[0.229, 0.224, 0.225]) ])
 
 class KeypointsDataset(Dataset):
     def __init__(self, h5_path, num_classes, img_height, img_width, radius, transform):
@@ -40,7 +41,7 @@ class KeypointsDataset(Dataset):
         img = cv2.resize(img, (self.img_width, self.img_height))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        img = self.transform(img)
+        img = self.transform(Image.fromarray(img))
         labels = self.labels[index][()]
 
         visible = np.zeros(self.num_classes)
@@ -51,8 +52,8 @@ class KeypointsDataset(Dataset):
         offsets_y = np.zeros((self.num_classes, self.img_height, self.img_width), dtype='float32')
         
         for i in range(0, self.num_classes * 3, 3):
-            x = labels[i]
-            y = labels[i + 1]
+            x = round(labels[i] * self.img_width)
+            y = round(labels[i + 1] * self.img_height)
             
             _i = i // 3
 

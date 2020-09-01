@@ -1,5 +1,5 @@
-# import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 import h5py
 import torch
@@ -43,11 +43,17 @@ def forward(sample_batched, model):
     
     return custom_loss(predictions_maps, maps, predictions_offsets_x, offsets_x, predictions_offsets_y, offsets_y)
 
-def fit(train_data, test_data, model, loss_function, epochs, checkpoint_path='', tensorboard_path=''):
+def fit(train_data, test_data, model, loss_function, epochs, initial_epoch=0, checkpoint_path='', tensorboard_path=''):
+
+    global optimizer
 
     writer = SummaryWriter(log_dir=tensorboard_path)
 
-    for epoch in range(epochs):
+    for epoch in range(initial_epoch, epochs):
+
+        # Adjust learning rate
+        adjust_learning_rate(optimizer, epoch)
+
         # training 
         train_loss = 0.0
         progressBar = tqdm(enumerate(train_data), desc="Epoch: %03d, loss: %02.3f"%(epoch, 0.0)) 
@@ -79,7 +85,7 @@ def fit(train_data, test_data, model, loss_function, epochs, checkpoint_path='',
         writer.add_scalar("loss/train", train_loss, epoch)
         writer.add_scalar("loss/val", test_loss, epoch)
         
-        torch.save(keypoints.state_dict(), checkpoint_path + 'model_' + str(epoch)+'.pth')
+        torch.save(keypoints.module.state_dict(), checkpoint_path + 'model_' + str(epoch)+'.pth')
 
 # dataset
 # Train
@@ -104,8 +110,22 @@ smoothL1Loss = nn.SmoothL1Loss()
 bceLoss = nn.BCELoss()
 # model
 keypoints = Keypoints(NUM_CLASSES, img_height=IMG_HEIGHT, img_width=IMG_WIDTH)
+#keypoints.load_state_dict(torch.load("weights/model_19.pth"))
 keypoints = nn.DataParallel(keypoints.cuda()) if use_cuda else keypoints
-# optimizer
-optimizer = optim.Adam(keypoints.parameters(), lr=0.0001)
 
-fit(train_data, test_data, keypoints, custom_loss, epochs=40, checkpoint_path='weights/', tensorboard_path="log/")
+
+
+
+# Learning rate
+lr = 0.0001
+
+def adjust_learning_rate(optimzer, epoch):
+
+    new_lr = lr * (0.1) ** (epoch//20)
+    for param_group in optimzer.param_groups:
+        param_group["lr"] = new_lr
+
+# optimizer
+optimizer = optim.Adam(keypoints.parameters(), lr=lr)
+
+fit(train_data, test_data, keypoints, custom_loss, initial_epoch=0, epochs=60, checkpoint_path='weights/v1/', tensorboard_path="log/v1")
